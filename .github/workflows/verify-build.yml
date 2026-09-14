@@ -28,8 +28,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build normal flavor (release)
-        run: ./gradlew assembleNormalRelease -P "version=${{ inputs.version }}"
+      - name: Build normal + legacy flavors (release)
+        run: ./gradlew assembleNormalRelease assembleLegacyRelease -P "version=${{ inputs.version }}"
 
       # 配置了签名 secret 时用与正式发布相同的密钥签名；未配置则保留未签名产物（仅供编译验证，无法安装）
       - name: Sign release APKs (if signing secrets configured)
@@ -48,18 +48,21 @@ jobs:
           BT_DIR=$(ls -d "$SDK_ROOT"/build-tools/* | sort -V | tail -n 1)
           echo "Using build-tools: $BT_DIR"
           echo "${ANDROID_SIGNING_KEY}" | base64 -d > "$RUNNER_TEMP/sesame-m-release.jks"
-          # 签名 normal/release 目录下的全部 ABI 拆分 APK（universal + arm64-v8a + armeabi-v7a）
-          for APK_FILE in app/build/outputs/apk/normal/release/*.apk; do
-            [ -e "$APK_FILE" ] || { echo "No APK found in app/build/outputs/apk/normal/release"; exit 1; }
-            echo "Signing $(basename "$APK_FILE")"
-            "$BT_DIR/zipalign" -f 4 "$APK_FILE" "$RUNNER_TEMP/aligned.apk"
-            "$BT_DIR/apksigner" sign \
-              --ks "$RUNNER_TEMP/sesame-m-release.jks" \
-              --ks-key-alias "$ANDROID_KEY_ALIAS" \
-              --ks-pass "pass:${ANDROID_KEYSTORE_PASSWORD}" \
-              --key-pass "pass:${ANDROID_KEY_PASSWORD}" \
-              --out "$APK_FILE" \
-              "$RUNNER_TEMP/aligned.apk"
+          # 分别签名 normal / legacy 两个 flavor 下的全部 ABI 拆分 APK
+          for flavor in normal legacy; do
+            APK_DIR="app/build/outputs/apk/$flavor/release"
+            for APK_FILE in "$APK_DIR"/*.apk; do
+              [ -e "$APK_FILE" ] || { echo "No APK found in $APK_DIR"; exit 1; }
+              echo "Signing $(basename "$APK_FILE")"
+              "$BT_DIR/zipalign" -f 4 "$APK_FILE" "$RUNNER_TEMP/aligned.apk"
+              "$BT_DIR/apksigner" sign \
+                --ks "$RUNNER_TEMP/sesame-m-release.jks" \
+                --ks-key-alias "$ANDROID_KEY_ALIAS" \
+                --ks-pass "pass:${ANDROID_KEYSTORE_PASSWORD}" \
+                --key-pass "pass:${ANDROID_KEY_PASSWORD}" \
+                --out "$APK_FILE" \
+                "$RUNNER_TEMP/aligned.apk"
+            done
           done
 
       - name: List APK outputs
@@ -71,5 +74,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sesame-m-test-apks
-          path: app/build/outputs/apk/normal/release/*.apk
+          path: |
+            app/build/outputs/apk/normal/release/*.apk
+            app/build/outputs/apk/legacy/release/*.apk
           if-no-files-found: error

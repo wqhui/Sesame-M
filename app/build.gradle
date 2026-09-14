@@ -46,6 +46,10 @@ android {
             dimension "default"
             ext.applicationType = "Normal"
         }
+        legacy {
+            dimension "default"
+            ext.applicationType = "Legacy"
+        }
     }
     buildTypes {
         release {
@@ -65,6 +69,15 @@ android {
     sourceSets {
         main {
             jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+        // 现代版（libxposed API 102）：normal 使用 modern 代码与 Xposed 元数据
+        normal {
+            java.srcDirs += ['src/modern/java']
+            resources.srcDirs += ['src/modernResources']
+        }
+        // legacy（传统 API ≤93）：java/assets 由 src/legacy 目录承载，不引入任何 libxposed 资源
+        legacy {
+            java.srcDirs += ['src/legacy/java']
         }
     }
     packaging {
@@ -91,15 +104,17 @@ androidComponents {
                     abiTag = "-" + f.getIdentifier()
                 }
             }
-            output.outputFileName.set("Sesame-M-Normal${abiTag}-${project.appVersion}.apk")
+            String appType = variant.name.startsWith('legacy') ? 'Legacy' : 'Normal'
+            output.outputFileName.set("Sesame-M-${appType}${abiTag}-${project.appVersion}.apk")
         }
     }
 }
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
-    compileOnly 'io.github.libxposed:api:102.0.0'
-    implementation 'io.github.libxposed:service:102.0.0'
+    normalCompileOnly 'io.github.libxposed:api:102.0.0'
+    normalImplementation 'io.github.libxposed:service:102.0.0'
+    legacyCompileOnly files('libs/api-82.jar')
     compileOnly group: 'org.projectlombok', name: 'lombok', version: '1.18.32'
     annotationProcessor group: 'org.projectlombok', name: 'lombok', version: '1.18.32'
     implementation 'com.elvishew:xlog:1.11.0'

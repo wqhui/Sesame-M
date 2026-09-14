@@ -1,9 +1,6 @@
 package io.github.aw1y2z.sesame.util;
 
-import android.util.Log;
-
-import io.github.libxposed.api.XposedInterface;
-import io.github.libxposed.api.XposedModule;
+import io.github.aw1y2z.sesame.util.compat.HookBackend;
 import io.github.aw1y2z.sesame.util.compat.XC_MethodHook;
 
 import java.lang.reflect.Constructor;
@@ -27,16 +24,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class XHelpers {
 
     private static final String TAG = "XHelpers";
-    private static XposedModule sModule;
-    private static final AtomicInteger sHookSeq = new AtomicInteger(0);
+    /** 当前生效的 hook 后端：libxposed(API102) 或 legacy Xposed(≤93)，由入口类在运行时注入 */
+    private static volatile HookBackend sBackend;
 
-    public static void init(XposedModule module) {
-        sModule = module;
+    public static void setBackend(HookBackend backend) {
+        sBackend = backend;
     }
 
     private static void ensureInit() {
-        if (sModule == null) {
-            throw new IllegalStateException("XHelpers 未初始化，请在 XposedModule.onModuleLoaded 中调用 XHelpers.init(this)");
+        if (sBackend == null) {
+            throw new IllegalStateException("XHelpers 未初始化，请先由框架入口调用 XHelpers.setBackend(...)");
         }
     }
 
@@ -196,40 +193,7 @@ public class XHelpers {
 
     public static XC_MethodHook.Unhook hookMember(java.lang.reflect.Member member, XC_MethodHook callback) {
         ensureInit();
-        XposedInterface.HookHandle handle = sModule.hook((Executable) member)
-                .setId("xh_" + sHookSeq.incrementAndGet())
-                .setExceptionMode(XposedInterface.ExceptionMode.DEFAULT)
-                .intercept(chain -> {
-                    XC_MethodHook.MethodHookParam param = new XC_MethodHook.MethodHookParam();
-                    param.thisObject = chain.getThisObject();
-                    param.args = chain.getArgs().toArray();
-                    try {
-                        callback.callBefore(param);
-                    } catch (Throwable t) {
-                        Log.e(TAG, "beforeHookedMethod error", t);
-                        return chain.proceed(param.args);
-                    }
-                    if (param.hasResult) {
-                        return param.result;
-                    }
-                    Object result;
-                    try {
-                        result = chain.proceed(param.args);
-                    } catch (Throwable t) {
-                        Log.e(TAG, "proceed error", t);
-                        throw t;
-                    }
-                    param.result = result;
-                    param.hasResult = true;
-                    try {
-                        callback.callAfter(param);
-                    } catch (Throwable t) {
-                        Log.e(TAG, "afterHookedMethod error", t);
-                        return param.result;
-                    }
-                    return param.result;
-                });
-        return () -> handle.unhook();
+        return sBackend.hook(member, callback);
     }
 
     // ----------------------------------------------------------------

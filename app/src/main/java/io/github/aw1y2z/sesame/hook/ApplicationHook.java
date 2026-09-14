@@ -72,12 +72,7 @@ import io.github.aw1y2z.sesame.util.TimeUtil;
 import io.github.aw1y2z.sesame.util.idMap.UserIdMap;
 import lombok.Getter;
 
-import androidx.annotation.NonNull;
-import io.github.libxposed.api.XposedInterface;
-import io.github.libxposed.api.XposedModule;
-import io.github.libxposed.api.XposedModuleInterface;
-
-public class ApplicationHook extends XposedModule {
+public class ApplicationHook {
 
     private static final String TAG = ApplicationHook.class.getSimpleName();
 
@@ -142,44 +137,6 @@ public class ApplicationHook extends XposedModule {
 
     public static void setOffline(boolean offline) {
         ApplicationHook.offline = offline;
-    }
-
-    @Override
-    public void onModuleLoaded(@NonNull XposedModuleInterface.ModuleLoadedParam param) {
-        XHelpers.init(this);
-        log(4, TAG, "event=module_loaded api=" + getApiVersion()
-                + " framework=" + getFrameworkName() + " version=" + getFrameworkVersion());
-        markFile("/sdcard/sesame_diag.txt", "onModuleLoaded " + getFrameworkName() + " api=" + getApiVersion());
-        try {
-            // 读取与 App 共享的日志开关配置，使各分项开关在本进程真正生效
-            AppConfig.load();
-            // 模块已在 LSPosed 中启用：onModuleLoaded 被调用即代表已启用，
-            // 直接标记为已激活（与是否打开 / hook 支付宝无关）
-            ViewAppInfo.setRunTypeByCode(RunType.MODEL.getCode());
-            // 若 UI 已启动，发同进程广播实时刷新界面
-            Application app = (Application) Class.forName("android.app.ActivityThread")
-                    .getMethod("currentApplication").invoke(null);
-            if (app != null) {
-                app.sendBroadcast(new Intent("io.github.aw1y2z.sesame.status"));
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    private static void markFile(String path, String line) {
-        try {
-            java.io.FileWriter fw = new java.io.FileWriter(path, true);
-            fw.write(line + " @ " + new java.util.Date() + "\n");
-            fw.close();
-        } catch (Throwable ignored) {}
-    }
-
-    @Override
-    public void onPackageReady(@NonNull XposedModuleInterface.PackageReadyParam param) {
-        XC_LoadPackage.LoadPackageParam lpparam = new XC_LoadPackage.LoadPackageParam();
-        lpparam.packageName = param.getPackageName();
-        lpparam.processName = param.getPackageName();
-        lpparam.classLoader = param.getClassLoader();
-        handleLoadPackage(lpparam);
     }
 
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) {
