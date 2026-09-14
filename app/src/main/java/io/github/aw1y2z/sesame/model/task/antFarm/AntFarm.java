@@ -2854,6 +2854,11 @@ public class AntFarm extends ModelTask {
         return false;
     }
 
+    // 固定延迟基础上叠加 0~60ms 随机抖动，避免触发时间过于规整
+    private static void sleepWithJitter(int baseMillis) {
+        TimeUtil.sleep(baseMillis + RandomUtil.nextInt(0, 61));
+    }
+
     private void drawMachineGroups() {
         try {
             JSONObject jo = new JSONObject(AntFarmRpcCall.queryLoveCabin(UserIdMap.getCurrentUid()));
@@ -2914,7 +2919,7 @@ public class AntFarm extends ModelTask {
                 if (!drawMachine(scene)) {
                     return;
                 }
-                TimeUtil.sleep(5000);
+                sleepWithJitter(5000);
             }
         } catch (Throwable t) {
             Log.i(TAG, "drawMachine err:");
@@ -2957,7 +2962,7 @@ public class AntFarm extends ModelTask {
                             //检查并标记黑名单任务
                             MessageUtil.checkResultCodeAndMarkTaskBlackList("AntFarmDrawMachineTaskList", title, jodoFarmTask);
                         }
-                        TimeUtil.sleep(1000);
+                        sleepWithJitter(1000);
                     }
                     if (jo.optString("taskId").contains("SHANGYEHUA")) {
                         for (int j = 0; j < (rightsTimesLimit - rightsTimes); j++) {
@@ -2965,7 +2970,7 @@ public class AntFarm extends ModelTask {
                             //检查并标记黑名单任务
                             MessageUtil.checkResultCodeAndMarkTaskBlackList("AntFarmDrawMachineTaskList", title, jofinishTask);
                         }
-                        TimeUtil.sleep(2000);
+                        sleepWithJitter(2000);
                     }
 
                     //完成浏览类游戏任务
@@ -2975,11 +2980,11 @@ public class AntFarm extends ModelTask {
                             //检查并标记黑名单任务
                             MessageUtil.checkResultCodeAndMarkTaskBlackList("AntFarmDrawMachineTaskList", title, jofinishTask);
                         }
-                        TimeUtil.sleep(2000);
+                        sleepWithJitter(2000);
                     }
-                    TimeUtil.sleep(1000);
+                    sleepWithJitter(1000);
                 }
-                TimeUtil.sleep(2000);
+                sleepWithJitter(2000);
                 String taskId = jo.getString("taskId");
                 String awardType = jo.optString("awardType");
                 receiveFarmDrawTaskAward(taskId, title, awardType, taskSceneCode);
