@@ -393,24 +393,64 @@ public class AntMember extends ModelTask {
     
     private void queryPointCert(int page, int pageSize) {
         try {
-            JSONObject jo = new JSONObject(AntMemberRpcCall.queryPointCert(page, pageSize));
+            // 优先 V2 接口：支持「一键领取全部积分」
+            JSONObject jo = new JSONObject(AntMemberRpcCall.queryPointCertV2(page, pageSize));
+            TimeUtil.sleep(500);
+            if (MessageUtil.checkResultCode(TAG, jo) && jo.has("pointToClaim")) {
+                int pointToClaim = jo.optInt("pointToClaim", 0);
+                // 仅当客户端展示「一键领取」按钮且有待领积分时才走一键
+                if (pointToClaim > 0 && jo.optBoolean("showReceiveAllPointFunction", false)) {
+                    JSONObject receiveAll = new JSONObject(AntMemberRpcCall.receiveAllPointByUser());
+                    String receiveStatus = receiveAll.optString("receiveStatus");
+                    int receiveSumPoint = receiveAll.optInt("receiveSumPoint", 0);
+                    if ("SUCCESS".equals(receiveStatus) || receiveSumPoint > 0) {
+                        Log.other("会员任务🎖️[一键领取]#获得[" + receiveSumPoint + "积分]");
+                        return;
+                    }
+                    Log.other("会员任务🎖️[一键领取未确认成功，回退逐条领取]#receiveStatus=" + receiveStatus);
+                }
+                claimPointCertList(jo, page, pageSize);
+                return;
+            }
+
+            // V2 不可用回退旧接口逐条领取
+            jo = new JSONObject(AntMemberRpcCall.queryPointCert(page, pageSize));
             TimeUtil.sleep(500);
             if (!MessageUtil.checkResultCode(TAG, jo)) {
                 return;
             }
-            boolean hasNextPage = jo.getBoolean("hasNextPage");
-            JSONArray jaCertList = jo.getJSONArray("certList");
+            claimPointCertList(jo, page, pageSize);
+        }
+        catch (Throwable t) {
+            Log.i(TAG, "queryPointCert err:");
+            Log.printStackTrace(TAG, t);
+        }
+    }
+
+    private void claimPointCertList(JSONObject jo, int page, int pageSize) {
+        try {
+            boolean hasNextPage = jo.optBoolean("hasNextPage", false);
+            JSONArray jaCertList = jo.optJSONArray("certList");
+            if (jaCertList == null) {
+                return;
+            }
             for (int i = 0; i < jaCertList.length(); i++) {
-                jo = jaCertList.getJSONObject(i);
-                String bizTitle = jo.getString("bizTitle");
+                JSONObject cert = jaCertList.optJSONObject(i);
+                if (cert == null) {
+                    continue;
+                }
+                String bizTitle = cert.optString("bizTitle", cert.optString("title", "会员积分"));
                 //黑名单任务跳过
                 if (AntMemberTaskList.getValue().contains(bizTitle)) {
                     continue;
                 }
-                String id = jo.getString("id");
-                int pointAmount = jo.getInt("pointAmount");
-                jo = new JSONObject(AntMemberRpcCall.receivePointByUser(id));
-                if (MessageUtil.checkResultCode(TAG, jo)) {
+                String id = cert.optString("id", cert.optString("certId", ""));
+                if (id.isEmpty()) {
+                    continue;
+                }
+                int pointAmount = cert.optInt("pointAmount", cert.optInt("point", 0));
+                JSONObject receive = new JSONObject(AntMemberRpcCall.receivePointByUser(id));
+                if (MessageUtil.checkResultCode(TAG, receive)) {
                     Log.other("会员任务🎖️领取[" + bizTitle + "]奖励#获得[" + pointAmount + "积分]");
                 }
             }
@@ -419,7 +459,7 @@ public class AntMember extends ModelTask {
             }
         }
         catch (Throwable t) {
-            Log.i(TAG, "queryPointCert err:");
+            Log.i(TAG, "claimPointCertList err:");
             Log.printStackTrace(TAG, t);
         }
     }

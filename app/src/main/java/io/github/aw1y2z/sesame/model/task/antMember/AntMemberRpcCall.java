@@ -29,6 +29,16 @@ public class AntMemberRpcCall {
         return ApplicationHook.requestString("alipay.antmember.biz.rpc.member.h5.receivePointByUser", args1);
     }
 
+    public static String queryPointCertV2(int page, int pageSize) {
+        String args = "[{\"abTestInfo\":[],\"dbExpireDt\":0,\"dbId\":0,\"pageNum\":" + page + ",\"pageSize\":" + pageSize + ",\"sourcePassMap\":{\"innerSource\":\"\",\"source\":\"mytab\",\"unid\":\"\"}}]";
+        return ApplicationHook.requestString("com.alipay.alipaymember.biz.rpc.pointcert.h5.queryPointCertV2", args);
+    }
+
+    public static String receiveAllPointByUser() {
+        String args = "[{\"bizSource\":\"mytab\",\"sourcePassMap\":{\"innerSource\":\"\",\"source\":\"mytab\",\"unid\":\"\"}}]";
+        return ApplicationHook.requestString("com.alipay.alipaymember.biz.rpc.pointcert.h5.receiveAllPointByUser", args);
+    }
+
     public static String queryMemberSigninCalendar() {
         return ApplicationHook.requestString("com.alipay.amic.biz.rpc.signin.h5.queryMemberSigninCalendar", "[{\"autoSignIn\":true,\"invitorUserId\":\"\",\"sceneCode\":\"QUERY\"}]");
     }
